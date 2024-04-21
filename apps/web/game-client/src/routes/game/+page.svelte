@@ -27,8 +27,8 @@
 	};
 
 	const gotoServer = (event: CustomEvent) => {
-		console.log(event.detail);
-		goto(`/game/${event.detail[0]}`);
+		console.log(event)
+		goto(`/game/${event.detail[1]}`);
 	}
 				
 </script>

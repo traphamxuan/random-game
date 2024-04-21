@@ -20,7 +20,15 @@
 	// Floating UI for Popups
 	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
 	import { storePopup } from '@skeletonlabs/skeleton';
+	import { browser } from '$app/environment';
 	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
+	let userName = '';
+	if (browser) {
+		userName = localStorage.getItem('userName') || '';
+	}
+	const setUserName = () => {
+		localStorage.setItem('userName', userName);
+	}
 </script>
 
 <!-- App Shell -->
@@ -32,7 +40,7 @@
 				<strong class="text-xl uppercase">Miner</strong>
 			</svelte:fragment>
 			<svelte:fragment slot="trail">
-				<a
+				<!-- <a
 					class="btn btn-sm variant-ghost-surface"
 					href="https://discord.gg/EXqV7W8MtY"
 					target="_blank"
@@ -47,10 +55,11 @@
 					rel="noreferrer"
 				>
 					Twitter
-				</a>
+				</a> -->
+				<input type="text" class="input" placeholder="User name" on:change={setUserName} bind:value={userName}/>
 				<a
 					class="btn btn-sm variant-ghost-surface"
-					href="https://github.com/skeletonlabs/skeleton"
+					href="https://github.com/traphamxuan/random-game"
 					target="_blank"
 					rel="noreferrer"
 				>

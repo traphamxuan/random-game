@@ -19,7 +19,7 @@ export const GET: RequestHandler = (event) => {
   const body = JSON.stringify({
     id: game.id,
     question: game.question,
-    rewards: game.rewards,
+    rewards: game.logs.length,
     nextAt: game.nextAt,
   });
   console.log(game.question, game.answer)

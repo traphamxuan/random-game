@@ -3,7 +3,6 @@ export const initNewGame = (): GameRunning => ({
   id: 0,
   question: 'aa',
   answer: '96',
-  rewards: 0,
   nextAt: 0,
   startAt: Date.now(),
   logs: [],

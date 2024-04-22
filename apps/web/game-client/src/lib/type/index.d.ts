@@ -13,14 +13,12 @@ type GameData = {
   rewards: number;
   startAt: number;
   finishedAt: number;
-  logs: GameAction[];
 }
 
 type GameRunning = {
   id: number;
   question: string;
   answer: string;
-  rewards: number;
   nextAt: number;
   startAt: number;
   logs: GameAction[];

@@ -27,58 +27,71 @@
   }
 
   const processAnswer = async () => {
-    if (answerSent >= listChipAnswer.length) {
-      clearInterval(timer);
-      timer = undefined;
+    if (timer) {
       return;
     }
+    while (answerSent < listChipAnswer.length) {
+      const chip = listChipAnswer[answerSent];
+      await new Promise((ok, failed) => {
+        timer = setTimeout(async () => {
+          chip.state = 'primary';
+          answerSent++;
+          listChipAnswer = listChipAnswer;
+          const data = await fetch(`/api/game/${serverID}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              userId,
+              gameId: $storeGameState.gameData.id,
+              answer: chip.answer
+            })
+          })
 
-    const chip = listChipAnswer[answerSent];
-    chip.state = 'primary';
-    answerSent++;
-    listChipAnswer = listChipAnswer;
-    const data = await fetch(`/api/game/${serverID}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId,
-        gameId: $storeGameState.gameData.id,
-        answer: chip.answer
+          if (!data.ok) {
+            failed(data.statusText)
+            return;
+          }
+          let resp = await data.json();
+          const winner = resp['winner'];
+          const answer = resp['answer'];
+          const rewards = resp['rewards'];
+          chip.state = 'error';
+          if (winner || answer) {
+            const gameData: GameData = resp;
+            clearTimeout(timer)
+            timer = undefined;
+            if (winner === userId) {
+              chip.state = 'success';
+            }
+            storeGameState.stop(gameData);
+            listChipAnswer = [];
+            setAnswer = new Set();
+            answerSent = 0;
+            const response = await fetch(`/api/game/${serverID}/state`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            })
+            if (!response.ok) {
+              failed(response.statusText)
+              return;
+            }
+            resp = await response.json();
+            storeGameState.start(resp);
+          } else {
+            storeGameState.run(rewards);
+          }
+          listChipAnswer = listChipAnswer;
+          ok(null);
+        }, 500)
       })
-    })
-
-    if (!data.ok) {
-      throw new Error(data.statusText)
     }
-    let resp = await data.json();
-    const winner = resp['winner'];
-    const rewards = resp['rewards'];
-    chip.state = 'error';
-    if (winner) {
-      const gameData: GameData = resp;
-      clearInterval(timer)
-      timer = undefined;
-      if (winner === userId) {
-        chip.state = 'success';
-      }
-      storeGameState.stop(gameData);
-      const response = await fetch(`/api/game/${serverID}/state`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      resp = await response.json();
-      storeGameState.start(resp);
-      listChipAnswer = [];
-      setAnswer = new Set();
-      answerSent = 0;
-    } else {
-      storeGameState.run(rewards);
-    }
-    listChipAnswer = listChipAnswer;
+    clearTimeout(timer);
+    timer = undefined;
+    return;
   }
 
   const onUserEnter = (e: KeyboardEvent) => {
@@ -100,9 +113,7 @@
       });
       listChipAnswer = listChipAnswer;
       currentAnswer = '';
-      if (!timer) {
-        timer = setInterval(processAnswer, 500)
-      }
+      processAnswer();
     }
   }
 
@@ -126,11 +137,7 @@
       });
     }
     listChipAnswer = listChipAnswer;
-    if (!timer) {
-      timer = setInterval(() => {
-        processAnswer();
-      }, 500)
-    }
+    processAnswer();
   }
 
   onMount(() => {

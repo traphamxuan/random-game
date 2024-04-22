@@ -27,11 +27,14 @@ export const POST: RequestHandler = async (event) => {
   if (gameId > server.gameData.length || gameId < 0) {
     return error(400, 'Invalid game ID');
   }
+  if (!userId) {
+    return error(401, 'Unauthorized');
+  }
   server.users.add(userId);
   const headers = { 'Content-Type': 'application/json' };
 
   if (gameId !== game.id) {
-    const { logs: _, ...gameResult } = server.gameData[gameId];
+    const gameResult = server.gameData[gameId];
     return new Response(JSON.stringify(gameResult), { headers });
   }
   const now = Date.now();
@@ -41,21 +44,22 @@ export const POST: RequestHandler = async (event) => {
     answer: answer,
     time: now,
   })
-  game.rewards++
 
   if (answer !== game.answer) {
     const body = JSON.stringify({
       id: game.id,
       question: game.question,
-      rewards: game.rewards,
+      rewards: game.logs.length,
       nextAt: game.nextAt,
     });
     return new Response(body, { headers });
   }
 
-  const gameData = {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const {logs: _, ...gameData} = {
     ...game,
     winner: userId,
+    rewards: game.logs.length,
     numOfTries: game.logs.reduce((acc, log) => acc + (log.user === userId ? 1 : 0), 0),
     finishedAt: now,
   }
@@ -70,23 +74,23 @@ export const POST: RequestHandler = async (event) => {
   newGame.answer = hashString.slice(hashString.length - 2);
   server.game = newGame;
 
-  const { logs: _, ...gameResult } = gameData;
+  const gameResult = gameData;
   return new Response(JSON.stringify(gameResult), { headers });
 };
 
-export const PUT: RequestHandler = (event) => {
-  // do something
-  const body = JSON.stringify({ message: 'OK' });
-  const headers = { 'Content-Type': 'application/json' };
-  return new Response(body, { headers });
-}
+// export const PUT: RequestHandler = (event) => {
+//   // do something
+//   const body = JSON.stringify({ message: 'OK' });
+//   const headers = { 'Content-Type': 'application/json' };
+//   return new Response(body, { headers });
+// }
 
-export const PATCH: RequestHandler = (event) => {
-  // do something
-  const body = JSON.stringify({ message: 'OK' });
-  const headers = { 'Content-Type': 'application/json' };
-  return new Response(body, { headers });
-}
+// export const PATCH: RequestHandler = (event) => {
+//   // do something
+//   const body = JSON.stringify({ message: 'OK' });
+//   const headers = { 'Content-Type': 'application/json' };
+//   return new Response(body, { headers });
+// }
 
 export const GET: RequestHandler = (event) => {
   const contentType = event.request.headers.get('Content-Type');

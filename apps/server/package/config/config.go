@@ -4,32 +4,20 @@ import (
 	"context"
 
 	"github.com/caarlos0/env"
-	servicemanager "github.com/traphamxuan/random-game/package/service_manager"
+	"github.com/traphamxuan/gobs"
 )
 
 type Configuration struct {
 }
 
-var _ servicemanager.IService = (*Configuration)(nil)
+var _ gobs.IService = (*Configuration)(nil)
+
+func (c *Configuration) Init(context.Context, *gobs.Component) error {
+	return nil
+}
 
 func NewConfig(ctx context.Context) *Configuration {
 	return &Configuration{}
-}
-
-func (c *Configuration) Name() string {
-	return "Configuration"
-}
-
-func (c *Configuration) Setup(ctx context.Context) error {
-	return nil
-}
-
-func (c *Configuration) Start(ctx context.Context) error {
-	return nil
-}
-
-func (c *Configuration) Stop(ctx context.Context) error {
-	return nil
 }
 
 func (c *Configuration) ParseConfig(result interface{}) error {

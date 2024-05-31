@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/traphamxuan/random-game/app/api"
+	"game-random-api/internal/api"
 )
 
 type keyType string
@@ -52,7 +52,7 @@ func main() {
 		fmt.Println("Shutdown server via internal request")
 	}
 
-	quitCtx, done := context.WithTimeout(ctx, 5*time.Second)
+	quitCtx, done := context.WithTimeout(ctx, 10*time.Second)
 	go func() {
 		defer done()
 		app.Stop(quitCtx)

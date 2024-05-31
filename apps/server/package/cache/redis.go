@@ -7,17 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"game-random-api/package/config"
+
 	"github.com/redis/go-redis/v9"
-	"github.com/traphamxuan/random-game/package/config"
-	servicemanager "github.com/traphamxuan/random-game/package/service_manager"
+	"github.com/traphamxuan/gobs"
 )
-
-type Redis struct {
-	config  *config.Configuration
-	rClient *redis.Client
-}
-
-var _ servicemanager.IService = (*Redis)(nil)
 
 type RedisConfig struct {
 	Host     string `env:"REDIS_HOST" envDefault:"localhost"`
@@ -26,30 +20,41 @@ type RedisConfig struct {
 	DB       int    `env:"REDIS_DB" envDefault:"0"`
 }
 
-func NewRedis(ctx context.Context, sm *servicemanager.ServiceManager) *Redis {
-	return &Redis{
-		config: servicemanager.GetServiceOrPanic[*config.Configuration](sm, "Configuration", "Redis"),
+type Redis struct {
+	config  *RedisConfig
+	rClient *redis.Client
+}
+
+var _ gobs.IService = (*Redis)(nil)
+
+func (o *Redis) Init(ctx context.Context, sb *gobs.Component) error {
+	sb.Deps = []gobs.IService{
+		&config.Configuration{},
 	}
+	onSetup := func(ctx context.Context, dependencies []gobs.IService, _ []gobs.CustomService) error {
+		config := dependencies[0].(*config.Configuration)
+		var rdbCfg RedisConfig
+		if err := config.ParseConfig(&rdbCfg); err != nil {
+			return err
+		}
+		o.config = &rdbCfg
+		return o.Setup(ctx)
+	}
+	sb.OnSetup = &onSetup
+	return nil
+}
+
+func NewRedis(ctx context.Context) *Redis {
+	return &Redis{}
 }
 
 func (o *Redis) Setup(c context.Context) error {
-	var rdbCfg RedisConfig
-	if err := o.config.ParseConfig(&rdbCfg); err != nil {
-		return err
-	}
+
 	o.rClient = redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", rdbCfg.Host, rdbCfg.Port), // Redis server address
-		Password: rdbCfg.Password,                                // No password by default
-		DB:       rdbCfg.DB,                                      // Default DB
+		Addr:     fmt.Sprintf("%s:%d", o.config.Host, o.config.Port), // Redis server address
+		Password: o.config.Password,                                  // No password by default
+		DB:       o.config.DB,                                        // Default DB
 	})
-	return nil
-}
-
-func (o *Redis) Start(c context.Context) error {
-	return nil
-}
-
-func (o *Redis) Stop(c context.Context) error {
 	return nil
 }
 

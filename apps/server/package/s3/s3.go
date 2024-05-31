@@ -5,25 +5,17 @@ import (
 	"errors"
 	"net/http"
 
+	"game-random-api/package/config"
+	"game-random-api/package/logger"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	s3cfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/traphamxuan/random-game/package/config"
-	"github.com/traphamxuan/random-game/package/logger"
-	servicemanager "github.com/traphamxuan/random-game/package/service_manager"
+	"github.com/traphamxuan/gobs"
 )
-
-type S3 struct {
-	log        *logger.Logger
-	config     *config.Configuration
-	client     *s3.Client
-	bucketName string
-}
-
-var _ servicemanager.IService = (*S3)(nil)
 
 type S3Config struct {
 	AccessKey string `env:"S3_ACCESS_KEY"`
@@ -33,27 +25,51 @@ type S3Config struct {
 	URI       string `env:"S3_URI"`
 }
 
-func NewS3(ctx context.Context, sm *servicemanager.ServiceManager) *S3 {
-	return &S3{
-		log:    servicemanager.GetServiceOrPanic[*logger.Logger](sm, "Logger", "S3"),
-		config: servicemanager.GetServiceOrPanic[*config.Configuration](sm, "Configuration", "S3"),
+type S3 struct {
+	log    *logger.Logger
+	config *S3Config
+	client *s3.Client
+}
+
+var _ gobs.IService = (*S3)(nil)
+
+func NewS3(ctx context.Context) *S3 {
+	return &S3{}
+}
+
+func (s *S3) Init(ctx context.Context, sb *gobs.Component) error {
+	sb.Deps = []gobs.IService{
+		&logger.Logger{},
+		&config.Configuration{},
 	}
+
+	onnSetup := func(ctx context.Context, dependencies []gobs.IService, _ []gobs.CustomService) error {
+		s.log = dependencies[0].(*logger.Logger)
+		config := dependencies[1].(*config.Configuration)
+		var cfg S3Config
+		if err := config.ParseConfig(&cfg); err != nil {
+			return err
+		}
+		s.config = &cfg
+		s.Setup(ctx)
+		return nil
+	}
+	sb.OnSetup = &onnSetup
+
+	return nil
 }
 
 func (s *S3) Setup(ctx context.Context) error {
-	var s3Config S3Config
-	if err := s.config.ParseConfig(&s3Config); err != nil {
-		return err
-	}
+
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL: s3Config.URI,
+			URL: s.config.URI,
 		}, nil
 	})
 
 	s3Cfg, err := s3cfg.LoadDefaultConfig(ctx,
 		s3cfg.WithEndpointResolverWithOptions(r2Resolver),
-		s3cfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s3Config.AccessKey, s3Config.SecretKey, "")),
+		s3cfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.config.AccessKey, s.config.SecretKey, "")),
 		s3cfg.WithRegion("auto"),
 	)
 	if err != nil {
@@ -63,21 +79,12 @@ func (s *S3) Setup(ctx context.Context) error {
 	client := s3.NewFromConfig(s3Cfg)
 
 	s.client = client
-	s.bucketName = s3Config.Bucket
-	return nil
-}
-
-func (s *S3) Start(ctx context.Context) error {
-	return nil
-}
-
-func (s *S3) Stop(ctx context.Context) error {
 	return nil
 }
 
 func (s *S3) IsExisted(ctx context.Context, key string) (bool, error) {
 	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucketName),
+		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -92,7 +99,7 @@ func (s *S3) IsExisted(ctx context.Context, key string) (bool, error) {
 
 func (s *S3) FetchMetadata(c context.Context, key string) (map[string]string, error) {
 	resp, err := s.client.HeadObject(c, &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucketName),
+		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -104,8 +111,8 @@ func (s *S3) FetchMetadata(c context.Context, key string) (map[string]string, er
 
 func (s *S3) CopyObject(c context.Context, sourceKey string, destKey string, metadata map[string]string) error {
 	_, err := s.client.CopyObject(c, &s3.CopyObjectInput{
-		Bucket:            aws.String(s.bucketName),
-		CopySource:        aws.String(s.bucketName + "/" + sourceKey),
+		Bucket:            aws.String(s.config.Bucket),
+		CopySource:        aws.String(s.config.Bucket + "/" + sourceKey),
 		Key:               aws.String(destKey),
 		Metadata:          metadata,
 		MetadataDirective: types.MetadataDirectiveReplace,
@@ -119,7 +126,7 @@ func (s *S3) CopyObject(c context.Context, sourceKey string, destKey string, met
 
 func (s *S3) DeleteObject(c context.Context, key string) error {
 	_, err := s.client.DeleteObject(c, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucketName),
+		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
